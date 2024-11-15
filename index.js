@@ -21,7 +21,7 @@ app.post('/webhook', middleware(config), (req, res) => {
 });
 
 // Function to handle LINE messages
-function handleEvent(event) {
+async function handleEvent(event) {
   if (event.type === 'message' && event.message.type === 'text') {
     const userMessage = event.message.text;
 
@@ -60,11 +60,20 @@ function handleEvent(event) {
         replyMessage = 'กรุณาพิมพ์ข้อมูลในรูปแบบ: "ค่าน้ำตาล XX ค่าความดัน YY" (เช่น "ค่าน้ำตาล 90 ค่าความดัน 120")';
       }
 
+      // Fetch user profile to get displayName
+      let displayName = 'unknown';
+      try {
+        const profile = await client.getProfile(event.source.userId);
+        displayName = profile.displayName;
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+
       // Prepare data to send to Google Apps Script
       const googleScriptUrl = process.env.GOOGLE_SCRIPT_URL;
       const data = {
         userId: event.source.userId,
-        displayName: "unknown", // default in case not available
+        displayName,
         sugarLevel,
         pressureLevel,
         healthStatus,
