@@ -10,6 +10,9 @@ const config = {
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 
+// Google Apps Script URL
+const googleScriptUrl = process.env.GOOGLE_SCRIPT_URL;
+
 // Initialize LINE SDK client
 const client = new Client(config);
 
@@ -21,7 +24,7 @@ app.post('/webhook', middleware(config), (req, res) => {
 });
 
 // Function to handle LINE messages
-async function handleEvent(event) {
+function handleEvent(event) {
   if (event.type === 'message' && event.message.type === 'text') {
     const userMessage = event.message.text;
 
@@ -33,63 +36,51 @@ async function handleEvent(event) {
       const sugarLevel = parseInt(sugarMatch[1]);
       const pressureLevel = parseInt(pressureMatch[1]);
 
-      let replyMessage;
-      let healthStatus;
+      let replyMessage = "";
+      let healthStatus = "";
 
-      // Conditions for responses
+      // Check each condition and assign a specific message
       if (sugarLevel <= 100 && pressureLevel <= 120) {
-        healthStatus = "ปกติ";
-        replyMessage = 'ค่าของเติ้นอยู่ในเกณฑ์ปกติ ผ่านๆ! โปรดรักษาสุขภาพให้ดีต่อไปนะครับ';
+        replyMessage = 'ค่าน้ำตาลของเติ้นอยู่ในเกณฑ์ปกติ ผ่านๆ! โปรดรักษาสุขภาพให้ดีต่อไปนะครับ และ ค่าความดันของเติ้นอยู่ในเกณฑ์ปกติ โปรดรักษาสุขภาพต่อไปนะครับ';
+        healthStatus = 'ปกติ';
       } else if (sugarLevel > 100 && pressureLevel <= 120) {
-        healthStatus = "น้ำตาลสูง";
-        replyMessage = 'ค่าน้ำตาลของเติ้นสูงหว่าปกติจังนิ ออกกำลังกายควบคุมอาหารมั้งได้แล้วตะ ถ้าไม่ดีขึ้นแขบไปหาหมอนะ';
+        replyMessage = 'ค่าน้ำตาลของเติ้นสูงหว่าปกติจังนิ ออกกำลังกายควบคุมอาหารมั้งได้แล้วตะ ถ้าไม่ดีขึ้นแขบไปหาหมอนะ และ ค่าความดันของเติ้นอยู่ในเกณฑ์ปกติ โปรดรักษาสุขภาพต่อไปนะครับ';
+        healthStatus = 'น้ำตาลสูง';
+      } else if (sugarLevel < 70 && pressureLevel <= 120) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นต่ำเกินแล้วนิ และแนะนำให้รับกินอาหารที่มีน้ำตาล ถ้าไม่ดีขึ้นก็แขบไปหาหมอได้แล้ว และ ค่าความดันของเติ้นอยู่ในเกณฑ์ปกติ โปรดรักษาสุขภาพต่อไปนะครับ';
+        healthStatus = 'น้ำตาลต่ำ';
       } else if (sugarLevel <= 100 && pressureLevel > 120) {
-        healthStatus = "ความดันสูง";
-        replyMessage = 'ค่าความดันของคุณสูงเกินแล้วนิ ควรออกกำลังกายแล้วก็ลดอาหารเค็มมั้งได้แล้ว ถ้ามีอาการผิดปกติควรไปหาหมอนะ';
+        replyMessage = 'ค่าน้ำตาลของเติ้นอยู่ในเกณฑ์ปกติ ผ่านๆ! โปรดรักษาสุขภาพให้ดีต่อไปนะครับ และ ค่าความดันของเติ้นสูงเกินแล้วนิ ควรออกกำลังกายแล้วก็ลดอาหารเค็ม ถ้ามีอาการผิดปกติแขบไปหาหมอนะ';
+        healthStatus = 'ความดันสูง';
+      } else if (sugarLevel <= 100 && pressureLevel < 60) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นอยู่ในเกณฑ์ปกติ ผ่านๆ! โปรดรักษาสุขภาพให้ดีต่อไปนะครับ และ ค่าความดันต่ำ ควรนั่งพักและดื่มน้ำ ถ้าไม่ดีขึ้นควรไปหาหมอได้แล้ว';
+        healthStatus = 'ความดันต่ำ';
       } else if (sugarLevel > 100 && pressureLevel > 120) {
-        healthStatus = "น้ำตาลและความดันสูง";
-        replyMessage = 'ค่าน้ำตาลแล้วก็ค่าความดันของคุณสูงหว่าปกติจังแล้วนิ แนะนำให้ออกกำลังกายมั้งนะเติ้น ควบคุมอาหาร และไปหาหมอเพื่อตรวจสอบเพิ่มเติมกันได้ปลอดภัย';
-      } else if (sugarLevel < 70) {
-        healthStatus = "น้ำตาลต่ำ";
-        replyMessage = 'ค่าน้ำตาลของเติ้นต่ำเกินแล้วนิ และแนะนำให้รับกินอาหารที่มีน้ำตาล ถ้าไม่ดีขึ้นก็แขบไปหาหมอได้แล้ว';
-      } else if (pressureLevel < 60) {
-        healthStatus = "ความดันต่ำ";
-        replyMessage = 'ค่าความดันต่ำ ควรนั่งพักและดื่มน้ำ ถ้าไม่ดีขึ้นควรไปหาหมอได้แล้ว';
-      } else {
-        healthStatus = "ข้อมูลผิดพลาด";
-        replyMessage = 'กรุณาพิมพ์ข้อมูลในรูปแบบ: "ค่าน้ำตาล XX ค่าความดัน YY" (เช่น "ค่าน้ำตาล 90 ค่าความดัน 120")';
+        replyMessage = 'ค่าน้ำตาลของเติ้นสูงหว่าปกติจังนิ ออกกำลังกายควบคุมอาหารมั้งได้และตะ ถ้าไม่ดีขึ้นแขบไปหาหมอนะ และ ค่าความดันของเติ้นสูงเกินแล้วนิ ควรออกกำลังกายแล้วก็ลดอาหารเค็ม ถ้ามีอาการผิดปกติควรไปหาหมอนะ';
+        healthStatus = 'น้ำตาลและความดันสูง';
+      } else if (sugarLevel > 100 && pressureLevel < 60) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นสูงหว่าปกติจังนิ ออกกำลังกายควบคุมอาหารมั้งได้และตะ ถ้าไม่ดีขึ้นควรไปหาหมอนะ และ ค่าความดันต่ำ ควรนั่งพักและดื่มน้ำ ถ้าไม่ดีขึ้นแขบไปหาหมอได้แล้ว';
+        healthStatus = 'น้ำตาลสูงและความดันต่ำ';
+      } else if (sugarLevel < 70 && pressureLevel > 120) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นต่ำเกินแล้วนิ และแนะนำให้รับกินอาหารที่มีน้ำตาล ถ้าไม่ดีขึ้นก็แขบไปหาหมอได้แล้ว และ ค่าความดันของเติ้นสูงเกินแล้วนิ ควรออกกำลังกายแล้วก็ลดอาหารเค็ม ถ้ามีอาการผิดปกติควรไปหาหมอนะ';
+        healthStatus = 'น้ำตาลต่ำและความดันสูง';
       }
 
-      // Fetch user profile to get displayName
-      let displayName = 'unknown';
-      try {
-        const profile = await client.getProfile(event.source.userId);
-        displayName = profile.displayName;
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-      }
-
-      // Prepare data to send to Google Apps Script
-      const googleScriptUrl = process.env.GOOGLE_SCRIPT_URL;
-      const data = {
+      // Send data to Google Sheets
+      axios.post(googleScriptUrl, {
         userId: event.source.userId,
-        displayName,
-        sugarLevel,
-        pressureLevel,
-        healthStatus,
-        advice: replyMessage
-      };
+        sugarLevel: sugarLevel,
+        pressureLevel: pressureLevel,
+        healthStatus: healthStatus,
+        advice: replyMessage,
+        timestamp: new Date().toLocaleString(),
+      }).then(() => {
+        console.log('Data sent to Google Sheets');
+      }).catch(error => {
+        console.error('Error sending data to Google Sheets:', error);
+      });
 
-      // Send data to Google Apps Script
-      axios.post(googleScriptUrl, data)
-        .then(response => {
-          console.log('Data successfully sent to Google Sheet');
-        })
-        .catch(error => {
-          console.error('Error sending data to Google Sheet:', error);
-        });
-
-      // Reply to user
+      // Reply to user with the specific message
       return client.replyMessage(event.replyToken, {
         type: 'text',
         text: replyMessage,
